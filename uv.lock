@@ -343,7 +343,7 @@ wheels = [
 ]
 
 [[package]]
-name = "miner-client"
+name = "miner-agent"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

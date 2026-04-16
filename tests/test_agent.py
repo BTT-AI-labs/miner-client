@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from miner_client.agent import MinerAgent
-from miner_client.config import Settings
-from miner_client.identity import Identity
-from miner_client.state import AgentState
+from miner_agent.agent import MinerAgent
+from miner_agent.config import Settings
+from miner_agent.identity import Identity
+from miner_agent.state import AgentState
 
 
 class FakeApi:

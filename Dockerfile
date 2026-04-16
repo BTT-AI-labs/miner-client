@@ -11,4 +11,4 @@ RUN uv sync --frozen --no-dev
 
 EXPOSE 8080
 
-CMD ["uv", "run", "miner-client"]
+CMD ["uv", "run", "miner-agent"]

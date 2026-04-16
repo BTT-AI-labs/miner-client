@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from miner_client.protocol import build_challenge_digest, ed25519_public_key_to_peer_id
+from miner_agent.protocol import build_challenge_digest, ed25519_public_key_to_peer_id
 
 
 def test_ed25519_public_key_to_peer_id_matches_libp2p_prefix() -> None:

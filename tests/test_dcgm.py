@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from miner_client.dcgm import parse_dcgm_metrics
+from miner_agent.dcgm import parse_dcgm_metrics
 
 
 def test_parse_dcgm_metrics_extracts_summary_fields() -> None:

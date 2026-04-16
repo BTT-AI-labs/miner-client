@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "miner-client"
+name = "miner-agent"
 version = "0.1.0"
-description = "Miner client sidecar for modeldock deployments"
+description = "Node-side control-plane agent for decentralized miner deployments"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -26,7 +26,7 @@ dev = [
 ]
 
 [project.scripts]
-miner-client = "miner_client.main:main"
+miner-agent = "miner_agent.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

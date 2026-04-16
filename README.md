@@ -1,18 +1,18 @@
-# Miner Client
+# Miner Agent
 
-`miner-client` is the node-side control-plane agent for the V1 design in [../v1-decentralized-llm-cluster-design.md](../v1-decentralized-llm-cluster-design.md).
+`miner-agent` is the node-side control-plane agent for the V1 design in [../v1-decentralized-llm-cluster-design.md](../v1-decentralized-llm-cluster-design.md).
 
 It is intended to run beside `vllm` and `dcgm-exporter` in the fixed three-container topology described by the design doc:
 
 - `vllm`: serves inference traffic
 - `dcgm-exporter`: exposes GPU metrics
-- `miner-client`: handles registration, heartbeat, challenge flow, and local diagnostics
+- `miner-agent`: handles registration, heartbeat, challenge flow, and local diagnostics
 
 The current implementation is intentionally narrow. It does not start or stop local model processes. It only observes local state and reports it to `main-api`.
 
 ## What It Does
 
-On startup, `miner-client`:
+On startup, `miner-agent`:
 
 1. Loads `${MINER_HOME}/config.json`, or generates a new node identity and wallet identity on first boot.
 2. Starts a background loop.
@@ -123,7 +123,7 @@ Current heartbeat payload:
 Challenge flow:
 
 1. `register` or `heartbeat` returns `challenge_required=true`.
-2. `miner-client` calls `GET /api/miner/challenge?node_id=...&purpose=...`.
+2. `miner-agent` calls `GET /api/miner/challenge?node_id=...&purpose=...`.
 3. It builds the digest as `sha256(node_public_key:challenge_id:nonce:purpose:expires_at)`.
 4. It signs that digest with the locally persisted Ed25519 private key.
 5. It submits the answer to `POST /api/miner/challenge/verify`.
@@ -198,7 +198,7 @@ The FastAPI app exposes:
 
 ## Identity Persistence
 
-`miner-client` stores node identity in `${MINER_HOME}/config.json`.
+`miner-agent` stores node identity in `${MINER_HOME}/config.json`.
 
 Fields currently persisted:
 
@@ -224,24 +224,24 @@ Identity details:
 Build the image:
 
 ```bash
-docker build -t your-registry/miner-client:latest miner-client
+docker build -t your-registry/miner-agent:latest miner-agent
 ```
 
 Run locally with Python:
 
 ```bash
-cd miner-client
+cd miner-agent
 uv sync --dev
 export MAIN_API_BASE_URL=http://127.0.0.1:9000
-uv run miner-client
+uv run miner-agent
 ```
 
 Suggested Compose snippet:
 
 ```yaml
 services:
-  miner-client:
-    image: your-registry/miner-client:latest
+  miner-agent:
+    image: your-registry/miner-agent:latest
     environment:
       MAIN_API_BASE_URL: https://main-api.example.com
       MINER_TOKEN: replace-me
@@ -271,14 +271,14 @@ The implementation is usable as a V1 prototype, but it does not yet match the de
 3. GPU inventory is best-effort.
    Register payload now includes `gpus`, but GPU name and VRAM size depend on `nvidia-smi` being available. When it is unavailable, the client falls back to DCGM-derived capacity and leaves `name` empty.
 
-These gaps are important when aligning `miner-client` with a future `main-api` implementation. If `main-api` is built directly from the design doc, some request-field adaptation will still be needed.
+These gaps are important when aligning `miner-agent` with a future `main-api` implementation. If `main-api` is built directly from the design doc, some request-field adaptation will still be needed.
 
 ## Development
 
 Install dependencies and run tests:
 
 ```bash
-cd miner-client
+cd miner-agent
 uv sync --dev
 uv run pytest
 ```

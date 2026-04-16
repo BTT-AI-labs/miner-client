@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from miner_client.config import Settings
+from miner_agent.config import Settings
 
 
 def test_settings_from_env_defaults(monkeypatch) -> None:
@@ -15,7 +15,7 @@ def test_settings_from_env_defaults(monkeypatch) -> None:
     assert settings.http_host == "0.0.0.0"
     assert settings.http_port == 8080
     assert settings.vllm_base_url == "http://127.0.0.1:8000"
-    assert settings.dcgm_metrics_url == "http://127.0.0.1:9400/metrics"
+    assert settings.dcgm_metrics_url == "http://dcgm-exporter:9400/metrics"
 
 
 def test_settings_prefers_explicit_miner_urls(monkeypatch) -> None:
