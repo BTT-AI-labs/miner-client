@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 METRIC_GPU_UTIL = "DCGM_FI_DEV_GPU_UTIL"
 METRIC_FB_USED = "DCGM_FI_DEV_FB_USED"
 METRIC_FB_FREE = "DCGM_FI_DEV_FB_FREE"
