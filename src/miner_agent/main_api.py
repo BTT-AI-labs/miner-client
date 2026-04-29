@@ -13,6 +13,7 @@ class MainApiClient:
         if settings.miner_token:
             headers[settings.miner_token_header] = settings.miner_token
         timeout = httpx.Timeout(settings.request_timeout_seconds)
+        self._prefix_path = "/api/v1"
         self._client = httpx.AsyncClient(
             base_url=settings.main_api_base_url,
             headers=headers,
@@ -23,25 +24,24 @@ class MainApiClient:
         await self._client.aclose()
 
     async def register(self, payload: dict[str, Any]) -> dict[str, Any]:
-        response = await self._client.post("/api/miner/register", json=payload)
+        response = await self._client.post(f"{self._prefix_path}/miner/register", json=payload)
         response.raise_for_status()
         return _json_or_empty(response)
 
     async def heartbeat(self, payload: dict[str, Any]) -> dict[str, Any]:
-        response = await self._client.post("/api/miner/heartbeat", json=payload)
+        response = await self._client.post(f"{self._prefix_path}/miner/heartbeat", json=payload)
         response.raise_for_status()
         return _json_or_empty(response)
 
-    async def get_challenge(self, node_id: str, purpose: str) -> dict[str, Any]:
-        response = await self._client.get(
-            "/api/miner/challenge",
-            params={"node_id": node_id, "purpose": purpose},
-        )
+    async def get_challenge(self, payload: dict[str, Any]) -> dict[str, Any]:
+        response = await self._client.post(f"{self._prefix_path}/miner/challenge", json=payload)
         response.raise_for_status()
         return _json_or_empty(response)
 
     async def verify_challenge(self, payload: dict[str, Any]) -> dict[str, Any]:
-        response = await self._client.post("/api/miner/challenge/verify", json=payload)
+        response = await self._client.post(
+            f"{self._prefix_path}/miner/challenge/verify", json=payload
+        )
         response.raise_for_status()
         return _json_or_empty(response)
 

@@ -10,6 +10,7 @@ class AgentState:
     started_at: float = field(default_factory=time.time)
     identity_loaded: bool = False
     node_id: str | None = None
+    # whether registered on platform
     registered: bool = False
     verified: bool = False
     challenge_required: bool = False
@@ -31,6 +32,7 @@ class AgentState:
         self.last_error = None
         self.consecutive_failures = 0
 
+    # determine whether current agent node is in [Ready] state
     def ready(self, heartbeat_interval_seconds: float) -> bool:
         if not self.identity_loaded:
             return False

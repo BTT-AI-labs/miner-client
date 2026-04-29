@@ -52,10 +52,12 @@ class IdentityManager:
         self.save_identity(identity)
         return identity
 
+    # load local config.json from local fs
     def load_identity(self) -> Identity:
         raw = json.loads(self._config_path.read_text(encoding="utf-8"))
         return Identity(**raw)
 
+    # save config.json into local filesystem.
     def save_identity(self, identity: Identity) -> None:
         self._miner_home.mkdir(mode=0o700, parents=True, exist_ok=True)
         try:
@@ -77,7 +79,11 @@ class IdentityManager:
         )
         return private_key.sign(digest)
 
+    # generate a new node's pubkey & private key, as well as miners'
+    # nodes can share one wallet address, while every node must have
+    # single different node pubkey & private key
     def _generate_identity(self) -> Identity:
+        # node key-pair uses Ed25519 algo
         node_private_key = ed25519.Ed25519PrivateKey.generate()
         node_private_bytes = node_private_key.private_bytes(
             encoding=serialization.Encoding.Raw,
@@ -90,6 +96,9 @@ class IdentityManager:
         )
         node_id = ed25519_public_key_to_peer_id(node_public_bytes)
 
+        # miner's key-pair uses ECDSA over secp256k1, cause it's used in
+        # BTTC chain, a Ethereum compatible chain.
+        # miner's nodes can share one wallet address
         wallet_private_key = ec.generate_private_key(ec.SECP256K1())
         wallet_private_value = wallet_private_key.private_numbers().private_value.to_bytes(
             32, "big"
@@ -98,6 +107,7 @@ class IdentityManager:
             encoding=serialization.Encoding.X962,
             format=serialization.PublicFormat.UncompressedPoint,
         )
+        # Ethereum-like wallet address
         wallet_address = "0x" + keccak(wallet_public_bytes[1:])[-20:].hex()
 
         return Identity(

@@ -11,7 +11,7 @@ from .dcgm import parse_dcgm_metrics
 from .host import GpuInventoryItem, collect_gpu_inventory, collect_host_snapshot
 from .identity import Identity, IdentityManager
 from .main_api import MainApiClient
-from .protocol import build_challenge_digest, encode_signature
+from .protocol import build_tosign_digest, encode_signature
 from .state import AgentState
 from .vllm import VllmProbe
 
@@ -20,9 +20,12 @@ class MinerAgent:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.identity_manager = IdentityManager(settings.miner_home)
+        # current node's agent state info
         self.state = AgentState()
+        # current node's identity info
         self.identity: Identity | None = None
         self._api = MainApiClient(settings)
+        # mainly for dcgm-exporter service
         self._probe_client = httpx.AsyncClient(
             timeout=httpx.Timeout(settings.request_timeout_seconds)
         )
@@ -31,24 +34,31 @@ class MinerAgent:
         self._closed = False
 
     async def start(self) -> None:
+        # prevent re-entry
         if self._loop_task is not None:
             return
+        # ensure node & miner's identity
         self.identity = self.identity_manager.ensure_identity()
         self.state.identity_loaded = True
         self.state.node_id = self.identity.node_id
-        self._loop_task = asyncio.create_task(self._run_loop(), name="miner-agent-loop")
         try:
             await self.register_once()
             await self.heartbeat_once()
         except httpx.HTTPError:
             pass
+        # setup agent's scheduler
+        self._loop_task = asyncio.create_task(self._run_loop(), name="miner-agent-loop")
 
     async def stop(self) -> None:
         self._closed = True
-        if self._loop_task is not None:
-            self._loop_task.cancel()
+        loop_task = self._loop_task
+        self._loop_task = None
+
+        if loop_task is not None:
+            loop_task.cancel()
             try:
-                await self._loop_task
+                # wait for the task finish
+                await loop_task
             except asyncio.CancelledError:
                 pass
         await self._api.aclose()
@@ -68,10 +78,6 @@ class MinerAgent:
             "agent_version": self.settings.miner_version,
             "runtime_type": register_profile["runtime_type"],
             "gpus": register_profile["gpus"],
-            "deployment_name": self.settings.deployment_name,
-            "version": self.settings.miner_version,
-            "target_model": self.settings.target_model,
-            "vllm_endpoint": self.settings.vllm_base_url,
         }
         try:
             response = await self._api.register(payload)
@@ -114,26 +120,41 @@ class MinerAgent:
 
     async def challenge_once(self, purpose: str = "reverify") -> dict[str, Any]:
         identity = self._require_identity()
-        challenge = await self._api.get_challenge(identity.node_id, purpose)
+        # first, get challenge from platform
+        now = int(time.time())
+        get_challenge_dict = {
+            "node_id": identity.node_id,
+            "timestamp": now,
+            "nonce": now,
+            "purpose": purpose,
+        }
+        get_challenge_digest = build_tosign_digest(get_challenge_dict)
+        get_challenge_sig = self.identity_manager.sign_challenge(identity, get_challenge_digest)
+        get_challenge_dict["sign_result"] = get_challenge_sig
+
+        challenge = await self._api.get_challenge(get_challenge_dict)
+
         challenge_id = str(challenge["challenge_id"])
         nonce = str(challenge["nonce"])
-        resolved_purpose = str(challenge.get("purpose", purpose))
-        expires_at = self._resolve_challenge_expiration(challenge)
-        digest = build_challenge_digest(
-            identity.node_public_key,
-            challenge_id,
-            nonce,
-            resolved_purpose,
-            expires_at,
+        expires_at = int(challenge["expires_at"])
+        resovled_purpose = challenge.get("purpose", purpose)
+        digest = build_tosign_digest(
+            {
+                "challenge_id": challenge_id,
+                "node_id": identity.node_id,
+                "nonce": nonce,
+                "purpose": resovled_purpose,
+                "expires_at": expires_at
+            }
         )
+        # then, sign the digest
         signature = self.identity_manager.sign_challenge(identity, digest)
         payload = {
             "node_id": identity.node_id,
-            "node_public_key": identity.node_public_key,
             "challenge_id": challenge_id,
-            "purpose": resolved_purpose,
-            "signature": encode_signature(signature),
+            "sign_result": encode_signature(signature),
         }
+        # lastly, verify the challenge
         response = await self._api.verify_challenge(payload)
         self.state.last_challenge_at = time.time()
         self.state.last_challenge_response = {
@@ -191,9 +212,11 @@ class MinerAgent:
             return {"status": "unavailable", "gpus": [], "error": str(exc)}
 
     async def _collect_gpu_inventory(self) -> list[GpuInventoryItem]:
+        # 1. collect gpu inventory by nvidia-smi cli
         inventory = await collect_gpu_inventory()
         if inventory:
             return inventory
+        # 2. or by dcgm-exporter metrics endpoint
         snapshot = await self._collect_gpu_metrics()
         fallback: list[GpuInventoryItem] = []
         for gpu in snapshot["gpus"]:
@@ -228,13 +251,13 @@ class MinerAgent:
 
     async def _run_loop(self) -> None:
         while not self._closed:
+            await asyncio.sleep(self.settings.heartbeat_interval_seconds)
             try:
                 if not self.state.registered:
                     await self.register_once()
                 await self.heartbeat_once()
             except httpx.HTTPError:
                 pass
-            await asyncio.sleep(self.settings.heartbeat_interval_seconds)
 
     def _require_identity(self) -> Identity:
         if self.identity is None:
