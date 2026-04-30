@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from miner_agent.util import parse_metric_line
+
 METRIC_GPU_UTIL = "DCGM_FI_DEV_GPU_UTIL"
 METRIC_FB_USED = "DCGM_FI_DEV_FB_USED"
 METRIC_FB_FREE = "DCGM_FI_DEV_FB_FREE"
@@ -36,7 +38,7 @@ def parse_dcgm_metrics(metrics_text: str) -> list[GpuMetric]:
         line = line.strip()
         if not line or line.startswith("#"):
             continue
-        parsed = _parse_metric_line(line)
+        parsed = parse_metric_line(line)
         if parsed is None:
             continue
         metric_name, labels, value = parsed
@@ -62,36 +64,6 @@ def parse_dcgm_metrics(metrics_text: str) -> list[GpuMetric]:
             )
         )
     return metrics
-
-
-def _parse_metric_line(line: str) -> tuple[str, dict[str, str], float] | None:
-    try:
-        left, raw_value = line.rsplit(" ", 1)
-    except ValueError:
-        return None
-
-    if "{" in left and left.endswith("}"):
-        metric_name, labels_blob = left.split("{", 1)
-        labels = _parse_labels(labels_blob[:-1])
-    else:
-        metric_name = left
-        labels = {}
-
-    try:
-        value = float(raw_value)
-    except ValueError:
-        return None
-    return metric_name, labels, value
-
-
-def _parse_labels(text: str) -> dict[str, str]:
-    labels: dict[str, str] = {}
-    if not text:
-        return labels
-    for item in text.split(","):
-        key, value = item.split("=", 1)
-        labels[key.strip()] = value.strip().strip('"')
-    return labels
 
 
 def _gpu_index_from_labels(labels: dict[str, str]) -> int | None:

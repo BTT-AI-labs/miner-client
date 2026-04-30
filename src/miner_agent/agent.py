@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import secrets
 import time
 from typing import Any
 
@@ -91,18 +92,24 @@ class MinerAgent:
             self.state.mark_failure(f"register failed: {exc}")
             raise
 
+    def _generate_nonce(self, byte_length: int = 32) -> str:
+        return secrets.token_hex(byte_length)
+
     async def heartbeat_once(self) -> dict[str, Any]:
         identity = self._require_identity()
         snapshot = await self.collect_snapshot()
         payload = {
             "node_id": identity.node_id,
-            "node_public_key": identity.node_public_key,
-            "wallet_address": identity.wallet_address,
-            "deployment_name": self.settings.deployment_name,
-            "version": self.settings.miner_version,
             "timestamp": int(time.time()),
             **snapshot,
+            "nonce": self._generate_nonce(),
         }
+
+        digest = build_tosign_digest(payload)
+        signature = self.identity_manager.sign(identity, digest)
+
+        payload["sign_result"] = signature
+
         try:
             response = await self._api.heartbeat(payload)
             self.state.last_heartbeat_at = time.time()
@@ -129,7 +136,7 @@ class MinerAgent:
             "purpose": purpose,
         }
         get_challenge_digest = build_tosign_digest(get_challenge_dict)
-        get_challenge_sig = self.identity_manager.sign_challenge(identity, get_challenge_digest)
+        get_challenge_sig = self.identity_manager.sign(identity, get_challenge_digest)
         get_challenge_dict["sign_result"] = get_challenge_sig
 
         challenge = await self._api.get_challenge(get_challenge_dict)
@@ -144,11 +151,11 @@ class MinerAgent:
                 "node_id": identity.node_id,
                 "nonce": nonce,
                 "purpose": resovled_purpose,
-                "expires_at": expires_at
+                "expires_at": expires_at,
             }
         )
         # then, sign the digest
-        signature = self.identity_manager.sign_challenge(identity, digest)
+        signature = self.identity_manager.sign(identity, digest)
         payload = {
             "node_id": identity.node_id,
             "challenge_id": challenge_id,
@@ -184,18 +191,13 @@ class MinerAgent:
         host_snapshot, gpu_snapshot, vllm_snapshot = await asyncio.gather(
             host_task, dcgm_task, vllm_task
         )
-        current_requests = vllm_snapshot.get("current_requests")
-        models = self._build_models_payload(vllm_snapshot, current_requests)
-        return {
-            **host_snapshot,
-            "gpus": gpu_snapshot["gpus"],
-            "models": models,
-            "gpu_metrics_status": gpu_snapshot["status"],
-            "gpu_metrics": gpu_snapshot["gpus"],
-            "vllm": vllm_snapshot,
-            "current_request_count": current_requests,
-        }
+        return {**host_snapshot, "gpus": gpu_snapshot["gpus"], "vllm": vllm_snapshot}
 
+    async def _collect_vllm_status(self) -> dict[str, Any]:
+        status = await self._vllm_probe.collect(self._probe_client)
+        return status.to_dict()
+
+    # return host's cpu_percent & memory_percent
     async def _collect_host_metrics(self) -> dict[str, Any]:
         try:
             return (await collect_host_snapshot()).to_dict()
@@ -231,10 +233,6 @@ class MinerAgent:
                 )
             )
         return fallback
-
-    async def _collect_vllm_status(self) -> dict[str, Any]:
-        status = await self._vllm_probe.collect(self._probe_client)
-        return status.to_dict()
 
     async def _handle_challenge_signal(
         self, response: dict[str, Any], default_purpose: str
@@ -272,28 +270,3 @@ class MinerAgent:
             base_ts = int(issued_at) if issued_at is not None else int(time.time())
             return base_ts + int(challenge["expires_in"])
         raise KeyError("challenge response must include expires_at or expires_in")
-
-    def _build_models_payload(
-        self,
-        vllm_snapshot: dict[str, Any],
-        current_requests: int | None,
-    ) -> list[dict[str, Any]]:
-        serving_models = vllm_snapshot.get("serving_models")
-        models: list[str] = (
-            [model for model in serving_models if isinstance(model, str)]
-            if isinstance(serving_models, list)
-            else []
-        )
-        if not models and self.settings.target_model:
-            models = [self.settings.target_model]
-        model_status = str(vllm_snapshot.get("model_status", "unknown"))
-        endpoint = str(vllm_snapshot.get("endpoint", self.settings.vllm_base_url))
-        return [
-            {
-                "model": model,
-                "status": model_status,
-                "endpoint": endpoint,
-                "current_requests": current_requests,
-            }
-            for model in models
-        ]

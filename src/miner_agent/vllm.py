@@ -5,15 +5,17 @@ from typing import Any
 
 import httpx
 
+from miner_agent.util import parse_metric_line
 
+VLLM_METRICS_RUNNING_REQUESTS = "vllm:num_requests_running"
+VLLM_METRICS_WAITING_REQUESTS = "vllm:num_requests_waiting"
 @dataclass(frozen=True)
 class VllmStatus:
     process_status: str
     health_status: str
     model_status: str
     serving_models: list[str]
-    endpoint: str
-    load: float | None
+    waiting_requests: int | None
     current_requests: int | None
 
     def to_dict(self) -> dict[str, object]:
@@ -22,8 +24,6 @@ class VllmStatus:
             "health_status": self.health_status,
             "model_status": self.model_status,
             "serving_models": self.serving_models,
-            "endpoint": self.endpoint,
-            "load": self.load,
             "current_requests": self.current_requests,
         }
 
@@ -37,7 +37,6 @@ class VllmProbe:
         process_status = "down"
         health_status = "error"
         serving_models: list[str] = []
-        load: float | None = None
         current_requests: int | None = None
 
         try:
@@ -53,8 +52,7 @@ class VllmProbe:
                 health_status="error",
                 model_status="not_ready",
                 serving_models=[],
-                endpoint=self._base_url,
-                load=None,
+                waiting_requests=None,
                 current_requests=None,
             )
 
@@ -66,11 +64,11 @@ class VllmProbe:
             serving_models = []
 
         try:
-            load_response = await client.get(f"{self._base_url}/load")
+            load_response = await client.get(f"{self._base_url}/metrics")
             if load_response.status_code == 200:
-                load, current_requests = _parse_load(load_response.json())
+                waiting_requests, current_requests = _parse_load(load_response.json())
         except (httpx.HTTPError, ValueError):
-            load = None
+            waiting_requests = None
             current_requests = None
 
         if not serving_models:
@@ -85,8 +83,7 @@ class VllmProbe:
             health_status=health_status,
             model_status=model_status,
             serving_models=serving_models,
-            endpoint=self._base_url,
-            load=load,
+            waiting_requests=waiting_requests,
             current_requests=current_requests,
         )
 
@@ -102,19 +99,23 @@ def _parse_models(payload: dict[str, Any]) -> list[str]:
     return models
 
 
-def _parse_load(payload: Any) -> tuple[float | None, int | None]:
-    if isinstance(payload, (int, float)):
-        return float(payload), None
-    if not isinstance(payload, dict):
-        return None, None
-    load = payload.get("load")
-    current_requests = (
-        payload.get("current_requests")
-        or payload.get("active_requests")
-        or payload.get("num_requests")
-    )
-    load_value = float(load) if isinstance(load, (int, float)) else None
-    current_request_value = (
-        int(current_requests) if isinstance(current_requests, (int, float)) else None
-    )
-    return load_value, current_request_value
+def _parse_load(metrics_text: str) -> tuple[int | None, int | None]:
+    current_requests, waiting_requests = 0, 0
+    metrics : dict[str, Any] = {}
+    for line in metrics_text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parsed = parse_metric_line(line)
+        if parsed is None:
+            continue
+        metric_name, _, value = parsed
+        metrics[metric_name] = value
+
+    if VLLM_METRICS_RUNNING_REQUESTS in metrics:
+        current_requests = metrics[VLLM_METRICS_RUNNING_REQUESTS]
+
+    if VLLM_METRICS_WAITING_REQUESTS in metrics:
+        waiting_requests = metrics[VLLM_METRICS_WAITING_REQUESTS]
+    
+    return waiting_requests, current_requests

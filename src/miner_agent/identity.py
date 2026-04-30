@@ -73,7 +73,7 @@ class IdentityManager:
         except OSError:
             pass
 
-    def sign_challenge(self, identity: Identity, digest: bytes) -> bytes:
+    def sign(self, identity: Identity, digest: bytes) -> bytes:
         private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
             bytes.fromhex(identity.node_private_key)
         )

@@ -177,7 +177,7 @@ def test_challenge_accepts_expires_in(tmp_path: Path) -> None:
         assert identity_arg is identity
         return b"signed"
 
-    agent.identity_manager.sign_challenge = fake_sign  # type: ignore[method-assign]
+    agent.identity_manager.sign = fake_sign  # type: ignore[method-assign]
 
     response = asyncio.run(agent.challenge_once("register"))
 

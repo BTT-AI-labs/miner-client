@@ -23,7 +23,7 @@ def test_sign_challenge_returns_verifiable_signature(tmp_path: Path) -> None:
     identity = manager.ensure_identity()
     digest = b"challenge-digest"
 
-    signature = manager.sign_challenge(identity, digest)
+    signature = manager.sign(identity, digest)
 
     assert isinstance(signature, bytes)
     assert signature
