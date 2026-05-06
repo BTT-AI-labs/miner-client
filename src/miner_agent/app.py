@@ -24,7 +24,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             await agent.stop()
 
-    app = FastAPI(title="miner-agent", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="miner-agent", version=runtime_settings.miner_version, lifespan=lifespan)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

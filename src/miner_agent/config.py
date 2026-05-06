@@ -52,24 +52,25 @@ class Settings:
         )
         main_api_base_url = _normalize_url(_getenv("MAIN_API_BASE_URL"))
         return cls(
+            target_model=_getenv("MINER_TARGET_MODEL"),
             http_host=_getenv("MINER_HTTP_HOST", "0.0.0.0"),
             http_port=int(_getenv("MINER_HTTP_PORT", "8080")),
             log_level=_getenv("LOG_LEVEL", "info"),
             miner_home=Path(_getenv("MINER_HOME", "/root/.miner")),
             main_api_base_url=main_api_base_url,
-            miner_token=_getenv("MINER_TOKEN"),
-            miner_token_header=_getenv("MINER_TOKEN_HEADER", "X-Miner-Token"),
-            miner_name=_getenv("MINER_NAME", default_miner_name()),
+            vllm_base_url=vllm_base_url,
+            dcgm_metrics_url=dcgm_metrics_url,
             public_ip=_getenv("MINER_PUBLIC_IP"),
-            region=_getenv("MINER_REGION"),
             runtime_type=_getenv("MINER_RUNTIME_TYPE", "vllm"),
-            deployment_name=_getenv("MODELDOCK_DEPLOYMENT_NAME", "local"),
             miner_version=_getenv("MINER_VERSION", "0.1.0"),
             heartbeat_interval_seconds=float(_getenv("MINER_HEARTBEAT_INTERVAL_SECONDS", "30")),
             request_timeout_seconds=float(_getenv("MINER_REQUEST_TIMEOUT_SECONDS", "10")),
-            target_model=_getenv("MINER_TARGET_MODEL") or None,
-            vllm_base_url=vllm_base_url,
-            dcgm_metrics_url=dcgm_metrics_url,
+
+            deployment_name=_getenv("MODELDOCK_DEPLOYMENT_NAME", "local"),
+            region=_getenv("MINER_REGION"),
+            miner_token=_getenv("MINER_TOKEN"),
+            miner_token_header=_getenv("MINER_TOKEN_HEADER", "X-Miner-Token"),
+            miner_name=_getenv("MINER_NAME", default_miner_name()),
         )
 
     def validate(self) -> None:

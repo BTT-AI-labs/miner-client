@@ -11,7 +11,6 @@ VLLM_METRICS_RUNNING_REQUESTS = "vllm:num_requests_running"
 VLLM_METRICS_WAITING_REQUESTS = "vllm:num_requests_waiting"
 @dataclass(frozen=True)
 class VllmStatus:
-    process_status: str
     health_status: str
     model_status: str
     serving_models: list[str]
@@ -20,7 +19,6 @@ class VllmStatus:
 
     def to_dict(self) -> dict[str, object]:
         return {
-            "process_status": self.process_status,
             "health_status": self.health_status,
             "model_status": self.model_status,
             "serving_models": self.serving_models,
@@ -34,7 +32,6 @@ class VllmProbe:
         self._target_model = target_model
 
     async def collect(self, client: httpx.AsyncClient) -> VllmStatus:
-        process_status = "down"
         health_status = "error"
         serving_models: list[str] = []
         current_requests: int | None = None
@@ -42,13 +39,11 @@ class VllmProbe:
         try:
             health_response = await client.get(f"{self._base_url}/health")
             if health_response.status_code == 200:
-                process_status = "alive"
                 health_status = "ok"
             else:
                 health_status = f"http_{health_response.status_code}"
         except httpx.HTTPError:
             return VllmStatus(
-                process_status="down",
                 health_status="error",
                 model_status="not_ready",
                 serving_models=[],
@@ -79,7 +74,6 @@ class VllmProbe:
             model_status = "ready"
 
         return VllmStatus(
-            process_status=process_status,
             health_status=health_status,
             model_status=model_status,
             serving_models=serving_models,
