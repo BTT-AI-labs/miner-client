@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -10,6 +11,8 @@ from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 from eth_hash.auto import keccak
 
 from .protocol import ed25519_public_key_to_peer_id
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -47,37 +50,64 @@ class IdentityManager:
 
     def ensure_identity(self) -> Identity:
         if self._config_path.exists():
+            logger.info("loading existing identity: config_path=%s", self._config_path)
             return self.load_identity()
+        logger.info(
+            "identity config not found; generating new identity: config_path=%s", self._config_path
+        )
         identity = self._generate_identity()
         self.save_identity(identity)
         return identity
 
     # load local config.json from local fs
     def load_identity(self) -> Identity:
-        raw = json.loads(self._config_path.read_text(encoding="utf-8"))
-        return Identity(**raw)
+        try:
+            raw = json.loads(self._config_path.read_text(encoding="utf-8"))
+            identity = Identity(**raw)
+        except Exception:
+            logger.exception("identity load failed: config_path=%s", self.config_path)
+            raise
+        logger.info(
+            "identity loaded: node_id=%s wallet_address=%s config_path=%s",
+            identity.node_id,
+            _mask_wallet_address(identity.wallet_address),
+            self.config_path,
+        )
+        return identity
 
     # save config.json into local filesystem.
     def save_identity(self, identity: Identity) -> None:
         self._miner_home.mkdir(mode=0o700, parents=True, exist_ok=True)
         try:
             self._miner_home.chmod(0o700)
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.warning(
+                "failed to set miner home permissions: path=%s error=%s",
+                self._miner_home,
+                exc,
+            )
         self._config_path.write_text(
             json.dumps(asdict(identity), indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
         try:
             self._config_path.chmod(0o600)
-        except OSError:
-            pass
+        except OSError as exc:
+            logger.warning(
+                "failed to set identity config permissions: path=%s error=%s",
+                self.config_path,
+                exc,
+            )
 
     def sign(self, identity: Identity, digest: bytes) -> bytes:
-        private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
-            bytes.fromhex(identity.node_private_key)
-        )
-        return private_key.sign(digest)
+        try:
+            private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+                bytes.fromhex(identity.node_private_key)
+            )
+            return private_key.sign(digest)
+        except Exception:
+            logger.exception("identity signing failed: node_id=%s", identity.node_id)
+            raise
 
     # generate a new node's pubkey & private key, as well as miners'
     # nodes can share one wallet address, while every node must have
@@ -121,3 +151,9 @@ class IdentityManager:
             wallet_address=wallet_address,
             created_at=int(time.time()),
         )
+
+
+def _mask_wallet_address(address: str) -> str:
+    if len(address) <= 10:
+        return "***"
+    return f"f{address[:6]}...{address[-4:]}"

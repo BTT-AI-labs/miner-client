@@ -5,6 +5,9 @@ import socket
 from dataclasses import dataclass
 
 import psutil
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -55,12 +58,22 @@ async def collect_gpu_inventory() -> list[GpuInventoryItem]:
             stderr=asyncio.subprocess.PIPE,
         )
     except FileNotFoundError:
+        logger.debug("nvidia-smi not found; gpu inventory unavailable")
         return []
 
     stdout, _stderr = await process.communicate()
     if process.returncode != 0:
+        logger.debug(
+            "nvidia-smi gpu inventory command failed: returncode=%s stderr=%s",
+            process.returncode,
+            _stderr.decode("utf-8", errors="replace")[:500],
+        )
         return []
-    return _parse_nvidia_smi_csv(stdout.decode("utf-8"))
+    items = _parse_nvidia_smi_csv(stdout.decode("utf-8"))
+
+    if not items:
+        logger.debug("nvidia-smi gpu inventory parsed no gpus")
+    return items
 
 
 def _parse_nvidia_smi_csv(text: str) -> list[GpuInventoryItem]:

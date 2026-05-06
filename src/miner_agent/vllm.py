@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -7,8 +8,12 @@ import httpx
 
 from miner_agent.util import parse_metric_line
 
+logger = logging.getLogger(__name__)
+
 VLLM_METRICS_RUNNING_REQUESTS = "vllm:num_requests_running"
 VLLM_METRICS_WAITING_REQUESTS = "vllm:num_requests_waiting"
+
+
 @dataclass(frozen=True)
 class VllmStatus:
     health_status: str
@@ -30,6 +35,11 @@ class VllmProbe:
     def __init__(self, base_url: str, target_model: str | None) -> None:
         self._base_url = base_url.rstrip("/")
         self._target_model = target_model
+        logger.debug(
+            "vllm probe initialized: base_url=%s target_model=%s",
+            self._base_url,
+            self._target_model,
+        )
 
     async def collect(self, client: httpx.AsyncClient) -> VllmStatus:
         health_status = "error"
@@ -42,7 +52,13 @@ class VllmProbe:
                 health_status = "ok"
             else:
                 health_status = f"http_{health_response.status_code}"
-        except httpx.HTTPError:
+                logger.debug(
+                    "vllm health check returned non-ok status: base_url=%s status_code=%s",
+                    self._base_url,
+                    health_response.status_code,
+                )
+        except httpx.HTTPError as exc:
+            logger.warning("vllm health check failed: base_url=%s error=%s", self._base_url, exc)
             return VllmStatus(
                 health_status="error",
                 model_status="not_ready",
@@ -55,23 +71,65 @@ class VllmProbe:
             models_response = await client.get(f"{self._base_url}/v1/models")
             if models_response.status_code == 200:
                 serving_models = _parse_models(models_response.json())
-        except (httpx.HTTPError, ValueError):
+            elif models_response.status_code != 200:
+                logger.debug(
+                    "vllm models request returned non-ok status: base_url=%s status_code=%s",
+                    self._base_url,
+                    models_response.status_code,
+                )
+
+        except httpx.HTTPError as exc:
+            logger.debug("vllm models request failed: base_url=%s error=%s", self._base_url, exc)
+            serving_models = []
+        except ValueError as exc:
+            logger.debug(
+                "vllm models response parse failed: base_url=%s error=%s", self._base_url, exc
+            )
             serving_models = []
 
         try:
             load_response = await client.get(f"{self._base_url}/metrics")
             if load_response.status_code == 200:
-                waiting_requests, current_requests = _parse_load(load_response.json())
-        except (httpx.HTTPError, ValueError):
+                waiting_requests, current_requests = _parse_load(load_response.text)
+        except httpx.HTTPError as exc:
+            logger.debug(
+                "vllm metrics request failed: base_url=%s error=%s",
+                self._base_url,
+                exc,
+            )
+            waiting_requests = None
+            current_requests = None
+        except ValueError as exc:
+            logger.debug(
+                "vllm metrics response parse failed: base_url=%s error=%s",
+                self._base_url,
+                exc,
+            )
             waiting_requests = None
             current_requests = None
 
         if not serving_models:
             model_status = "not_ready" if self._target_model else "loading"
         elif self._target_model and self._target_model not in serving_models:
+            logger.debug(
+                "vllm target model not serving yet: target_model=%s serving_models=%s",
+                self._target_model,
+                serving_models,
+            )
             model_status = "loading"
         else:
             model_status = "ready"
+
+        logger.debug(
+            "vllm status collected: base_url=%s health_status=%s model_status=%s "
+            "serving_model_count=%s waiting_requests=%s current_requests=%s",
+            self._base_url,
+            health_status,
+            model_status,
+            len(serving_models),
+            waiting_requests,
+            current_requests,
+        )
 
         return VllmStatus(
             health_status=health_status,
@@ -95,7 +153,7 @@ def _parse_models(payload: dict[str, Any]) -> list[str]:
 
 def _parse_load(metrics_text: str) -> tuple[int | None, int | None]:
     current_requests, waiting_requests = 0, 0
-    metrics : dict[str, Any] = {}
+    metrics: dict[str, Any] = {}
     for line in metrics_text.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -111,5 +169,5 @@ def _parse_load(metrics_text: str) -> tuple[int | None, int | None]:
 
     if VLLM_METRICS_WAITING_REQUESTS in metrics:
         waiting_requests = metrics[VLLM_METRICS_WAITING_REQUESTS]
-    
+
     return waiting_requests, current_requests
