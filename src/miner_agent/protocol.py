@@ -16,7 +16,7 @@ def ed25519_public_key_to_peer_id(public_key_bytes: bytes) -> str:
 
 
 def build_tosign_digest(dic: dict[str, Any]) -> bytes:
-    message = json.dumps(dic, sort_keys=True)
+    message = json.dumps(dic, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(message.encode("utf-8")).digest()
 
 

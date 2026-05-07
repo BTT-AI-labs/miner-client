@@ -91,18 +91,24 @@ class MinerAgent:
             register_profile["runtime_type"],
             len(register_profile["gpus"]),
         )
+        timestamp = int(time.time())
         payload = {
             "node_id": identity.node_id,
-            "node_public_key": identity.node_public_key,
+            "node_public_key": identity.node_public_key_base64,
             "node_key_type": identity.node_key_type,
             "wallet_address": identity.wallet_address,
             "name": register_profile["name"],
             "public_ip": register_profile["public_ip"],
-            # "region": register_profile["region"],
             "agent_version": self.settings.miner_version,
             "runtime_type": register_profile["runtime_type"],
             "gpus": register_profile["gpus"],
+            "timestamp": timestamp,
+            "nonce": self._generate_nonce()
         }
+        digest = build_tosign_digest(payload)
+        signature = self.identity_manager.sign(identity, digest)
+        payload["sign_result"] = encode_signature(signature)
+
         try:
             response = await self._api.register(payload)
             logger.info(
@@ -146,7 +152,7 @@ class MinerAgent:
         digest = build_tosign_digest(payload)
         signature = self.identity_manager.sign(identity, digest)
 
-        payload["sign_result"] = signature
+        payload["sign_result"] = encode_signature(signature)
 
         try:
             response = await self._api.heartbeat(payload)
@@ -183,7 +189,7 @@ class MinerAgent:
         }
         get_challenge_digest = build_tosign_digest(get_challenge_dict)
         get_challenge_sig = self.identity_manager.sign(identity, get_challenge_digest)
-        get_challenge_dict["sign_result"] = get_challenge_sig
+        get_challenge_dict["sign_result"] = encode_signature(get_challenge_sig)
 
         challenge = await self._api.get_challenge(get_challenge_dict)
 

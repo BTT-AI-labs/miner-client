@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import time
@@ -37,6 +38,10 @@ class Identity:
             "wallet_address": self.wallet_address,
             "created_at": self.created_at,
         }
+
+    @property
+    def node_public_key_base64(self) -> str:
+        return base64.b64encode(bytes.fromhex(self.node_public_key)).decode("ascii")
 
 
 class IdentityManager:
