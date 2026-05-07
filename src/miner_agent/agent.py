@@ -114,7 +114,7 @@ class MinerAgent:
             logger.info(
                 "miner registered: node_id=%s challenge_required=%s verified=%s",
                 identity.node_id,
-                response.get("chanllenge_required"),
+                response.get("challenge_required"),
                 response.get("verified"),
             )
             self.state.registered = True
@@ -181,22 +181,22 @@ class MinerAgent:
         logger.info("requesting challenge: node_id=%s purpose=%s", identity.node_id, purpose)
         # first, get challenge from platform
         now = int(time.time())
-        get_challenge_dict = {
+        get_challenge_payload = {
             "node_id": identity.node_id,
             "timestamp": now,
-            "nonce": now,
+            "nonce": self._generate_nonce(),
             "purpose": purpose,
         }
-        get_challenge_digest = build_tosign_digest(get_challenge_dict)
+        get_challenge_digest = build_tosign_digest(get_challenge_payload)
         get_challenge_sig = self.identity_manager.sign(identity, get_challenge_digest)
-        get_challenge_dict["sign_result"] = encode_signature(get_challenge_sig)
+        get_challenge_payload["sign_result"] = encode_signature(get_challenge_sig)
 
-        challenge = await self._api.get_challenge(get_challenge_dict)
+        challenge = await self._api.get_challenge(get_challenge_payload)
 
-        challenge_id = str(challenge["challenge_id"])
-        nonce = str(challenge["nonce"])
-        expires_at = int(challenge["expires_at"])
-        resovled_purpose = challenge.get("purpose", purpose)
+        challenge_id = str(challenge["data"]["challenge_id"])
+        nonce = str(challenge["data"]["nonce"])
+        expires_at = challenge["data"]["expires_at"]
+        resovled_purpose = challenge["data"].get("purpose", purpose)
         logger.info(
             "challenge received: node_id=%s challenge_id=%s purpopse: %s expires_at=%s",
             identity.node_id,

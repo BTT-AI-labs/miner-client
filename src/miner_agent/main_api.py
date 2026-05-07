@@ -68,7 +68,13 @@ class MainApiClient:
         return _json_or_empty(response)
 
     async def register(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return await self._post(f"{self._prefix_path}/miner/register", payload)
+        try:
+            return await self._post(f"{self._prefix_path}/miner/register", payload)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 409:
+                logger.warning("warning: miner already registered with existing node public key")
+                return {"verified": False, "challenge_required": True}
+            raise
 
     async def heartbeat(self, payload: dict[str, Any]) -> dict[str, Any]:
         return await self._post(f"{self._prefix_path}/miner/heartbeat", payload)

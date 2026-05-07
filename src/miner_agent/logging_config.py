@@ -9,3 +9,5 @@ def configure_logging(level: str = "info") -> None:
         stream=sys.stdout,
         force=True,
     )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
