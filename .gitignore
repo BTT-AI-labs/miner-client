@@ -24,3 +24,5 @@ dist/
 
 # Local tool state
 *.log
+.vscode/*
+.miner/*

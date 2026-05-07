@@ -61,16 +61,16 @@ class Settings:
             main_api_base_url=main_api_base_url,
             vllm_base_url=vllm_base_url,
             dcgm_metrics_url=dcgm_metrics_url,
-            public_ip=_getenv("MINER_PUBLIC_IP"),
+            public_ip=_getenv("MINER_PUBLIC_IP", "127.0.0.1"),
             runtime_type=_getenv("MINER_RUNTIME_TYPE", "vllm"),
             miner_version=_getenv("MINER_VERSION", __version__),
             heartbeat_interval_seconds=float(_getenv("MINER_HEARTBEAT_INTERVAL_SECONDS", "30")),
             request_timeout_seconds=float(_getenv("MINER_REQUEST_TIMEOUT_SECONDS", "10")),
             deployment_name=_getenv("MODELDOCK_DEPLOYMENT_NAME", "local"),
+            miner_name=_getenv("MINER_NAME", default_miner_name()),
             region=_getenv("MINER_REGION"),
             miner_token=_getenv("MINER_TOKEN"),
             miner_token_header=_getenv("MINER_TOKEN_HEADER", "X-Miner-Token"),
-            miner_name=_getenv("MINER_NAME", default_miner_name()),
         )
 
     def validate(self) -> None:

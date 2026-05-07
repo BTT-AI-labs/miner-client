@@ -53,7 +53,7 @@ class MainApiClient:
             raise
         except httpx.HTTPError as exc:
             logger.warning(
-                "main api reqeust failed: method=POST path=%s extra=%s error=%s",
+                "main api request failed: method=POST path=%s extra=%s error=%s",
                 path,
                 extra,
                 exc,
