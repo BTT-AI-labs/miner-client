@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "miner-agent"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Node-side control-plane agent for decentralized miner deployments"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,19 +20,19 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
-  "pytest>=8,<9",
-  "ruff>=0.11,<0.12",
-]
+dev = ["pytest>=8,<9", "ruff>=0.11,<0.12"]
 
 [project.scripts]
 miner-agent = "miner_agent.main:main"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "miner_agent._version.__version__" }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -46,6 +46,4 @@ target-version = "py310"
 select = ["E", "F", "I", "B"]
 
 [dependency-groups]
-dev = [
-    "ruff>=0.11.13",
-]
+dev = ["ruff>=0.11.13"]

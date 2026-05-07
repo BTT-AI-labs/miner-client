@@ -4,6 +4,7 @@ import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from . import __version__
 from .host import default_miner_name
 
 
@@ -52,20 +53,19 @@ class Settings:
         )
         main_api_base_url = _normalize_url(_getenv("MAIN_API_BASE_URL"))
         return cls(
-            target_model=_getenv("MINER_TARGET_MODEL"),
-            http_host=_getenv("MINER_HTTP_HOST", "0.0.0.0"),
-            http_port=int(_getenv("MINER_HTTP_PORT", "8080")),
             log_level=_getenv("LOG_LEVEL", "info"),
             miner_home=Path(_getenv("MINER_HOME", "/root/.miner")),
+            target_model=_getenv("MINER_TARGET_MODEL"),
+            http_host=_getenv("MINER_HTTP_HOST", "127.0.0.1"),
+            http_port=int(_getenv("MINER_HTTP_PORT", "8080")),
             main_api_base_url=main_api_base_url,
             vllm_base_url=vllm_base_url,
             dcgm_metrics_url=dcgm_metrics_url,
             public_ip=_getenv("MINER_PUBLIC_IP"),
             runtime_type=_getenv("MINER_RUNTIME_TYPE", "vllm"),
-            miner_version=_getenv("MINER_VERSION", "0.1.0"),
+            miner_version=_getenv("MINER_VERSION", __version__),
             heartbeat_interval_seconds=float(_getenv("MINER_HEARTBEAT_INTERVAL_SECONDS", "30")),
             request_timeout_seconds=float(_getenv("MINER_REQUEST_TIMEOUT_SECONDS", "10")),
-
             deployment_name=_getenv("MODELDOCK_DEPLOYMENT_NAME", "local"),
             region=_getenv("MINER_REGION"),
             miner_token=_getenv("MINER_TOKEN"),
@@ -80,6 +80,8 @@ class Settings:
             raise ValueError("MINER_HEARTBEAT_INTERVAL_SECONDS must be > 0")
         if self.request_timeout_seconds <= 0:
             raise ValueError("MINER_REQUEST_TIMEOUT_SECONDS must be > 0")
+        if not self.public_ip:
+            raise ValueError("MINER_PUBLIC_IP is required")
 
     def public_dict(self) -> dict[str, object]:
         data = asdict(self)
