@@ -1,24 +1,24 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import socket
 from dataclasses import dataclass
 
 import psutil
-import logging
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class HostSnapshot:
-    cpu_percent: float
-    memory_percent: float
+    cpu_percent_x10: int
+    memory_percent_x10: int
 
-    def to_dict(self) -> dict[str, float]:
+    def to_dict(self) -> dict[str, int]:
         return {
-            "cpu_percent": self.cpu_percent,
-            "memory_percent": self.memory_percent,
+            "cpu_percent_x10": self.cpu_percent_x10,
+            "memory_percent_x10": self.memory_percent_x10,
         }
 
 
@@ -45,7 +45,10 @@ async def collect_host_snapshot() -> HostSnapshot:
         asyncio.to_thread(psutil.cpu_percent, 0.1),
         asyncio.to_thread(lambda: float(psutil.virtual_memory().percent)),
     )
-    return HostSnapshot(cpu_percent=float(cpu_percent), memory_percent=float(memory_percent))
+    return HostSnapshot(
+        cpu_percent_x10=int(cpu_percent * 10 + 0.5),
+        memory_percent_x10=int(memory_percent * 10 + 0.5),
+    )
 
 
 async def collect_gpu_inventory() -> list[GpuInventoryItem]:

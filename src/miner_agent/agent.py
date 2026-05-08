@@ -150,8 +150,9 @@ class MinerAgent:
         }
 
         digest = build_tosign_digest(payload)
+        
         signature = self.identity_manager.sign(identity, digest)
-
+        logger.info("digest=%s signature: %s", digest.hex(), signature.hex())
         payload["sign_result"] = encode_signature(signature)
 
         try:
@@ -269,8 +270,8 @@ class MinerAgent:
             "probe snapshot collected: node_id=%s cpu_percent=%s memory_percent=%s "
             "gpu_count=%s vllm_health=%s vllm_model=%s",
             self.state.node_id,
-            host_snapshot.get("cpu_percent"),
-            host_snapshot.get("memory_percent"),
+            host_snapshot.get("cpu_percent_x10"),
+            host_snapshot.get("memory_percent_x10"),
             len(gpu_snapshot.get("gpus", [])),
             vllm_snapshot.get("health_status"),
             vllm_snapshot.get("model_status"),
