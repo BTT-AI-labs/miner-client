@@ -152,7 +152,6 @@ class MinerAgent:
         digest = build_tosign_digest(payload)
         
         signature = self.identity_manager.sign(identity, digest)
-        logger.info("digest=%s signature: %s", digest.hex(), signature.hex())
         payload["sign_result"] = encode_signature(signature)
 
         try:

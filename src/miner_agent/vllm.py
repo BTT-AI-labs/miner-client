@@ -135,8 +135,12 @@ class VllmProbe:
             health_status=health_status,
             model_status=model_status,
             serving_models=serving_models,
-            waiting_requests=waiting_requests,
-            current_requests=current_requests,
+            waiting_requests=int(waiting_requests)
+            if waiting_requests is not None
+            else waiting_requests,
+            current_requests=int(current_requests)
+            if current_requests is not None
+            else current_requests,
         )
 
 
