@@ -73,7 +73,7 @@ class MainApiClient:
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 409:
                 logger.warning("warning: miner already registered with existing node public key")
-                return {"verified": False, "challenge_required": True}
+                return {"data": {"verified": False, "challenge_required": True}}
             raise
 
     async def heartbeat(self, payload: dict[str, Any]) -> dict[str, Any]:

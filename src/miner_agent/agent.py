@@ -103,7 +103,7 @@ class MinerAgent:
             "runtime_type": register_profile["runtime_type"],
             "gpus": register_profile["gpus"],
             "timestamp": timestamp,
-            "nonce": self._generate_nonce()
+            "nonce": self._generate_nonce(),
         }
         digest = build_tosign_digest(payload)
         signature = self.identity_manager.sign(identity, digest)
@@ -114,14 +114,14 @@ class MinerAgent:
             logger.info(
                 "miner registered: node_id=%s challenge_required=%s verified=%s",
                 identity.node_id,
-                response.get("challenge_required"),
-                response.get("verified"),
+                response.get("data", {}).get("challenge_required"),
+                response.get("data", {}).get("verified"),
             )
             self.state.registered = True
             self.state.last_register_at = time.time()
             self.state.last_register_response = response
             self.state.clear_failure()
-            await self._handle_challenge_signal(response, default_purpose="register")
+            await self._handle_challenge_signal(response["data"], default_purpose="register")
             return response
         except httpx.HTTPError as exc:
             self.state.mark_failure(f"register failed: {exc}")
@@ -150,7 +150,7 @@ class MinerAgent:
         }
 
         digest = build_tosign_digest(payload)
-        
+
         signature = self.identity_manager.sign(identity, digest)
         payload["sign_result"] = encode_signature(signature)
 
@@ -159,15 +159,15 @@ class MinerAgent:
             logger.debug(
                 "heartbeat sent: node_id=%s verified=%s challenge_required=%s",
                 identity.node_id,
-                response.get("verified"),
-                response.get("challenge_required"),
+                response["data"].get("verified"),
+                response["data"].get("challenge_required"),
             )
             self.state.last_heartbeat_at = time.time()
             self.state.last_heartbeat_response = response
             self.state.last_probe_snapshot = snapshot
             self.state.clear_failure()
-            await self._handle_challenge_signal(response, default_purpose="reverify")
-            if response.get("verified") is True:
+            await self._handle_challenge_signal(response["data"], default_purpose="reverify")
+            if response["data"].get("verified") is True:
                 self.state.verified = True
             return response
         except httpx.HTTPError as exc:
@@ -193,10 +193,10 @@ class MinerAgent:
 
         challenge = await self._api.get_challenge(get_challenge_payload)
 
-        challenge_id = str(challenge["data"]["challenge_id"])
-        nonce = str(challenge["data"]["nonce"])
-        expires_at = challenge["data"]["expires_at"]
-        resovled_purpose = challenge["data"].get("purpose", purpose)
+        challenge_id = str(challenge.get("data", {})["challenge_id"])
+        nonce = str(challenge.get("data", {})["nonce"])
+        expires_at = challenge.get("data", {})["expires_at"]
+        resovled_purpose = challenge.get("data", {}).get("purpose", purpose)
         logger.info(
             "challenge received: node_id=%s challenge_id=%s purpopse: %s expires_at=%s",
             identity.node_id,
@@ -227,15 +227,18 @@ class MinerAgent:
                 "challenge verified: node_id=%s challenge_id=%s ok=%s verified=%s",
                 identity.node_id,
                 challenge_id,
-                response.get("ok"),
-                response.get("verified"),
+                response.get("data", {}).get("ok"),
+                response.get("data", {}).get("verified"),
             )
             self.state.last_challenge_at = time.time()
             self.state.last_challenge_response = {
                 "challenge": challenge,
                 "verify": response,
             }
-            if response.get("ok") is True or response.get("verified") is True:
+            if (
+                response.get("data", {}).get("ok") is True
+                or response.get("data", {}).get("verified") is True
+            ):
                 self.state.verified = True
                 self.state.challenge_required = False
                 self.state.clear_failure()
