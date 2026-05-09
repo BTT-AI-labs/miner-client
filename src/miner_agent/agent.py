@@ -346,7 +346,7 @@ class MinerAgent:
         self, response: dict[str, Any], default_purpose: str
     ) -> None:
         if response.get("verified") is True:
-            logger.info("miner verified by reponse: node_id=%s", self.state.node_id)
+            logger.info("miner verified by response: node_id=%s", self.state.node_id)
             self.state.verified = True
             self.state.challenge_required = False
         challenge_required = response.get("challenge_required") is True
