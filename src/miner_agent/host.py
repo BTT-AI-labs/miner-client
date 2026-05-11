@@ -26,13 +26,13 @@ class HostSnapshot:
 class GpuInventoryItem:
     index: int
     name: str | None
-    vram_gb: float | None
+    vram_mib: float | None
 
     def to_dict(self) -> dict[str, int | float | str | None]:
         return {
             "index": self.index,
             "name": self.name,
-            "vram_gb": self.vram_gb,
+            "vram_mib": self.vram_mib,
         }
 
 
@@ -100,7 +100,7 @@ def _parse_nvidia_smi_csv(text: str) -> list[GpuInventoryItem]:
             GpuInventoryItem(
                 index=index,
                 name=parts[1] or None,
-                vram_gb=round(vram_mb / 1024, 2) if vram_mb is not None else None,
+                vram_mib=int(vram_mb) if vram_mb is not None else None,
             )
         )
     return items
