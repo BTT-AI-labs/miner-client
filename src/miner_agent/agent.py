@@ -76,7 +76,7 @@ class MinerAgent:
                 # wait for the task finish
                 await loop_task
             except asyncio.CancelledError:
-                logger.debug("miner agent loop cancelled")
+                logger.warning("miner agent loop cancelled")
         await self._api.aclose()
         await self._probe_client.aclose()
         logger.info("miner agent stopped: node_id=%s", self.state.node_id)

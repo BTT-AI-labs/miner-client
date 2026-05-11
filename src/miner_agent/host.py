@@ -61,12 +61,12 @@ async def collect_gpu_inventory() -> list[GpuInventoryItem]:
             stderr=asyncio.subprocess.PIPE,
         )
     except FileNotFoundError:
-        logger.debug("nvidia-smi not found; gpu inventory unavailable")
+        logger.warning("nvidia-smi not found; gpu inventory unavailable")
         return []
 
     stdout, _stderr = await process.communicate()
     if process.returncode != 0:
-        logger.debug(
+        logger.warning(
             "nvidia-smi gpu inventory command failed: returncode=%s stderr=%s",
             process.returncode,
             _stderr.decode("utf-8", errors="replace")[:500],
@@ -75,7 +75,7 @@ async def collect_gpu_inventory() -> list[GpuInventoryItem]:
     items = _parse_nvidia_smi_csv(stdout.decode("utf-8"))
 
     if not items:
-        logger.debug("nvidia-smi gpu inventory parsed no gpus")
+        logger.warning("nvidia-smi gpu inventory parsed no gpus")
     return items
 
 
