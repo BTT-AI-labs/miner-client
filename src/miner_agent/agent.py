@@ -135,12 +135,13 @@ class MinerAgent:
         identity = self._require_identity()
         snapshot = await self.collect_snapshot()
         logger.debug(
-            "heartbeat snapshot collected: node_id=%s gpu_count=%s vllm_health=%s vllm_model=%s current_requests=%s",  # noqa: E501
+            "heartbeat snapshot collected: node_id=%s gpu_count=%s vllm_health=%s vllm_model=%s current_requests=%s waiting_requests=%s",  # noqa: E501
             identity.node_id,
             len(snapshot.get("gpus", [])),
             snapshot.get("vllm", {}).get("health_status"),
             snapshot.get("vllm", {}).get("model_status"),
             snapshot.get("vllm", {}).get("current_requests"),
+            snapshot.get("vllm", {}).get("waiting_requests")
         )
         payload = {
             "node_id": identity.node_id,
