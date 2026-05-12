@@ -332,7 +332,7 @@ class MinerAgent:
                 GpuInventoryItem(
                     index=int(gpu["index"]),
                     name=None,
-                    vram_gb=round(float(memory_total_mb) / 1024, 2)
+                    vram_mib=round(float(memory_total_mb) / 1024, 2)
                     if isinstance(memory_total_mb, (int, float))
                     else None,
                 )
