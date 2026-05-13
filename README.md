@@ -99,7 +99,7 @@ The FastAPI app exposes:
 ## Identity Persistence
 
 `miner-agent` stores node identity in `${MINER_HOME}/config.json`.
-You should mount a volume if you have static `wallet_address` or node info 
+You should mount a volume via `miner-cli` if you have static `wallet_address` or node info 
 
 Fields currently persisted:
 
