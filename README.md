@@ -1,6 +1,6 @@
 # Miner Agent
 
-`miner-agent` is the node-side control-plane agent for the V1 design in [../v1-decentralized-llm-cluster-design.md](../v1-decentralized-llm-cluster-design.md).
+`miner-agent` is the node-side control-plane agent.
 
 It is intended to run beside `vllm` and `dcgm-exporter` in the fixed three-container topology described by the design doc:
 
@@ -9,6 +9,7 @@ It is intended to run beside `vllm` and `dcgm-exporter` in the fixed three-conta
 - `miner-agent`: handles registration, heartbeat, challenge flow, and local diagnostics
 
 The current implementation is intentionally narrow. It does not start or stop local model processes. It only observes local state and reports it to `main-api`.
+And it's usually deployed by [`miner-cli`](https://github.com/BTT-AI-labs/miner-cli) CLI tool within Docker. 
 
 ## What It Does
 
