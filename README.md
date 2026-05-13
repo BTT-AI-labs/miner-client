@@ -123,16 +123,14 @@ Current heartbeat payload:
 Challenge flow:
 
 1. `register` or `heartbeat` returns `challenge_required=true`.
-2. `miner-agent` calls `GET /api/miner/challenge?node_id=...&purpose=...`.
-3. It builds the digest as `sha256(node_public_key:challenge_id:nonce:purpose:expires_at)`.
+2. `miner-agent` calls `POST /api/miner/challenge...`.
+3. It builds the digest as `sha256(${sgin_str})`.
 4. It signs that digest with the locally persisted Ed25519 private key.
 5. It submits the answer to `POST /api/miner/challenge/verify`.
 
 Challenge expiration compatibility:
 
 - preferred field: `expires_at`
-- accepted fallback: `expires_in`
-- when only `expires_in` is returned, the client derives `expires_at` from `issued_at`, `timestamp`, or local current time
 
 Current verify payload:
 
@@ -142,7 +140,7 @@ Current verify payload:
   "node_public_key": "<hex-ed25519-public-key>",
   "challenge_id": "chl_001",
   "purpose": "register",
-  "signature": "<base64-signature>"
+  "sign_result": "<base64-signature>"
 }
 ```
 
@@ -156,7 +154,7 @@ Environment variables currently supported by the code:
 | `MINER_TOKEN` | no | empty | Shared token for miner API auth |
 | `MINER_TOKEN_HEADER` | no | `X-Miner-Token` | Header name used for `MINER_TOKEN` |
 | `MINER_NAME` | no | hostname | Miner display name sent during register |
-| `MINER_PUBLIC_IP` | no | empty | Public IP reported during register |
+| `MINER_PUBLIC_IP` | yes | none | Public IP reported during register for vllm endpoints |
 | `MINER_REGION` | no | empty | Region reported during register |
 | `MINER_RUNTIME_TYPE` | no | `vllm` | Runtime type reported during register |
 | `MINER_HOME` | no | `/root/.miner` | Persistent directory for node identity |
@@ -164,9 +162,8 @@ Environment variables currently supported by the code:
 | `MINER_HTTP_PORT` | no | `8080` | Bind port for local diagnostics API |
 | `MINER_HEARTBEAT_INTERVAL_SECONDS` | no | `30` | Background heartbeat interval |
 | `MINER_REQUEST_TIMEOUT_SECONDS` | no | `10` | HTTP timeout for both probes and control-plane calls |
-| `MINER_VERSION` | no | `0.1.0` | Version string reported upstream |
-| `MINER_TARGET_MODEL` | no | empty | Expected served model ID |
-| `MINER_VLLM_BASE_URL` | no | `http://127.0.0.1:8000` | Local vLLM base URL |
+| `MINER_TARGET_MODEL` | yes | empty | Expected served model ID of HuggingFace |
+| `MINER_VLLM_BASE_URL` | yes | `http://127.0.0.1:8000` | Local vLLM base URL |
 | `MINER_DCGM_METRICS_URL` | no | `http://dcgm-exporter:9400/metrics` | Local DCGM metrics URL |
 | `MODELDOCK_INFERENCE_BASE_URL` | no | empty | Fallback for `MINER_VLLM_BASE_URL` |
 | `MODELDOCK_DCGM_EXPORTER_URL` | no | empty | Fallback for `MINER_DCGM_METRICS_URL` |
@@ -174,7 +171,6 @@ Environment variables currently supported by the code:
 
 Notes:
 
-- `MAIN_API_BASE_URL` is the only required setting.
 - Explicit `MINER_*` probe URLs override `MODELDOCK_*` fallback URLs.
 - The diagnostics API starts as part of the same process that runs the background agent loop.
 
@@ -199,6 +195,7 @@ The FastAPI app exposes:
 ## Identity Persistence
 
 `miner-agent` stores node identity in `${MINER_HOME}/config.json`.
+You should mount a volume if you have static `wallet_address` or node info 
 
 Fields currently persisted:
 
@@ -212,86 +209,9 @@ Fields currently persisted:
 - `wallet_address`
 - `created_at`
 
-Identity details:
+Identity details:ewfddd
 
 - `node_id` is derived from the Ed25519 public key as a libp2p-style Peer ID
 - challenge signatures use the Ed25519 node private key
 - `wallet_address` is derived from a secp256k1 keypair as an EVM-style address
 - the file is written with best-effort `0700` directory permissions and `0600` file permissions
-
-## Docker
-
-Build the image:
-
-```bash
-docker build -t your-registry/miner-agent:latest miner-agent
-```
-
-Run locally with Python:
-
-```bash
-cd miner-agent
-uv sync --dev
-export MAIN_API_BASE_URL=http://127.0.0.1:9000
-uv run miner-agent
-```
-
-Suggested Compose snippet:
-
-```yaml
-services:
-  miner-agent:
-    image: your-registry/miner-agent:latest
-    environment:
-      MAIN_API_BASE_URL: https://main-api.example.com
-      MINER_TOKEN: replace-me
-      MINER_HOME: /root/.miner
-      MINER_TARGET_MODEL: Qwen/Qwen2.5-72B-Instruct
-      MINER_VLLM_BASE_URL: http://vllm:8000
-      MINER_DCGM_METRICS_URL: http://dcgm-exporter:9400/metrics
-    volumes:
-      - ~/.miner:/root/.miner
-    depends_on:
-      - vllm
-      - dcgm-exporter
-    ports:
-      - "8080:8080"
-```
-
-## Gaps Against The V1 Design Doc
-
-The implementation is usable as a V1 prototype, but it does not yet match the design doc in several important places:
-
-1. vLLM load probing is optimistic.
-   The client probes `/load`, but that endpoint is not guaranteed across all vLLM deployments. When unavailable, load and current request count stay `null`.
-
-2. No Docker or runtime inspection is implemented.
-   The design doc mentions `docker.sock` as a possible local dependency, but the current code never reads Docker state and does not verify container topology.
-
-3. GPU inventory is best-effort.
-   Register payload now includes `gpus`, but GPU name and VRAM size depend on `nvidia-smi` being available. When it is unavailable, the client falls back to DCGM-derived capacity and leaves `name` empty.
-
-These gaps are important when aligning `miner-agent` with a future `main-api` implementation. If `main-api` is built directly from the design doc, some request-field adaptation will still be needed.
-
-## Development
-
-Install dependencies and run tests:
-
-```bash
-cd miner-agent
-uv sync --dev
-uv run pytest
-```
-
-Current test coverage is limited to:
-
-- config parsing
-- challenge digest stability
-- DCGM metrics parsing
-
-There are no tests yet for:
-
-- register/heartbeat payload compatibility
-- FastAPI endpoints
-- challenge end-to-end flow
-- vLLM probing behavior
