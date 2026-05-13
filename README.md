@@ -40,87 +40,6 @@ The implementation already follows the V1 control-plane route layout:
 - `GET /api/miner/challenge`
 - `POST /api/miner/challenge/verify`
 
-Current register payload:
-
-```json
-{
-  "node_id": "<peer-id>",
-  "node_public_key": "<hex-ed25519-public-key>",
-  "node_key_type": "ed25519",
-  "wallet_address": "0x...",
-  "name": "miner-shanghai-01",
-  "public_ip": "1.2.3.4",
-  "region": "ap-east",
-  "agent_version": "0.1.0",
-  "runtime_type": "vllm",
-  "gpus": [
-    {
-      "index": 0,
-      "name": "NVIDIA H100",
-      "vram_gb": 80.0
-    }
-  ],
-  "deployment_name": "local",
-  "version": "0.1.0",
-  "target_model": "Qwen/Qwen2.5-72B-Instruct",
-  "vllm_endpoint": "http://vllm:8000"
-}
-```
-
-Current heartbeat payload:
-
-```json
-{
-  "node_id": "<peer-id>",
-  "node_public_key": "<hex-ed25519-public-key>",
-  "wallet_address": "0x...",
-  "deployment_name": "local",
-  "version": "0.1.0",
-  "timestamp": 1710000000,
-  "cpu_percent": 42.5,
-  "memory_percent": 61.2,
-  "gpus": [
-    {
-      "index": 0,
-      "utilization": 78.0,
-      "memory_used_mb": 64512.0,
-      "memory_total_mb": 81920.0,
-      "temperature": 71.0,
-      "power_usage_w": 285.0
-    }
-  ],
-  "models": [
-    {
-      "model": "Qwen/Qwen2.5-72B-Instruct",
-      "status": "ready",
-      "endpoint": "http://vllm:8000",
-      "current_requests": 3
-    }
-  ],
-  "gpu_metrics_status": "ok",
-  "gpu_metrics": [
-    {
-      "index": 0,
-      "utilization": 78.0,
-      "memory_used_mb": 64512.0,
-      "memory_total_mb": 81920.0,
-      "temperature": 71.0,
-      "power_usage_w": 285.0
-    }
-  ],
-  "vllm": {
-    "process_status": "alive",
-    "health_status": "ok",
-    "model_status": "ready",
-    "serving_models": ["Qwen/Qwen2.5-72B-Instruct"],
-    "endpoint": "http://vllm:8000",
-    "load": 0.42,
-    "current_requests": 3
-  },
-  "current_request_count": 3
-}
-```
-
 Challenge flow:
 
 1. `register` or `heartbeat` returns `challenge_required=true`.
@@ -128,22 +47,6 @@ Challenge flow:
 3. It builds the digest as `sha256(${sgin_str})`.
 4. It signs that digest with the locally persisted Ed25519 private key.
 5. It submits the answer to `POST /api/miner/challenge/verify`.
-
-Challenge expiration compatibility:
-
-- preferred field: `expires_at`
-
-Current verify payload:
-
-```json
-{
-  "node_id": "<peer-id>",
-  "node_public_key": "<hex-ed25519-public-key>",
-  "challenge_id": "chl_001",
-  "purpose": "register",
-  "sign_result": "<base64-signature>"
-}
-```
 
 ## Runtime Configuration
 
