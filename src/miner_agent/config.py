@@ -36,6 +36,7 @@ class Settings:
     target_model: str | None
     vllm_base_url: str
     dcgm_metrics_url: str
+    miner_api_key: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -71,6 +72,7 @@ class Settings:
             region=_getenv("MINER_REGION"),
             miner_token=_getenv("MINER_TOKEN"),
             miner_token_header=_getenv("MINER_TOKEN_HEADER", "X-Miner-Token"),
+            miner_api_key=_getenv("MINER_API_KEY"),
         )
 
     def validate(self) -> None:
@@ -87,4 +89,5 @@ class Settings:
         data = asdict(self)
         data["miner_home"] = str(self.miner_home)
         data["miner_token"] = "***" if self.miner_token else ""
+        data["miner_api_key"] = "***" if self.miner_api_key else ""
         return data

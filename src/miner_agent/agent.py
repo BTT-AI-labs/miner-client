@@ -292,7 +292,7 @@ class MinerAgent:
                 "model_status": "not_ready",
                 "serving_models": [],
                 "current_requests": None,
-                "error": str(exc),
+                "error": type(exc).__name__,
             }
 
     # return host's cpu_percent & memory_percent
@@ -314,7 +314,7 @@ class MinerAgent:
             logger.warning(
                 "gpu metrics unavailable: url=%s errpr=%s", self.settings.dcgm_metrics_url, exc
             )
-            return {"status": "unavailable", "gpus": [], "error": str(exc)}
+            return {"status": "unavailable", "gpus": [], "error": type(exc).__name__}
 
     async def _collect_gpu_inventory(self) -> list[GpuInventoryItem]:
         # 1. collect gpu inventory by nvidia-smi cli

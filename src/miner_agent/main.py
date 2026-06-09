@@ -14,6 +14,20 @@ def main() -> None:
     settings.validate()
     configure_logging(settings.log_level)
     app = create_app(settings)
+    if settings.http_host in ("0.0.0.0", "::"):
+        if not settings.miner_api_key:
+            logging.warning(
+                "SECURITY WARNING: binding to %s without MINER_API_KEY exposes "
+                "all miner endpoints to the network. Set MINER_API_KEY to require "
+                "authentication.",
+                settings.http_host,
+            )
+        else:
+            logging.warning(
+                "binding to %s — ensure firewall rules restrict access. "
+                "API key authentication is enabled.",
+                settings.http_host,
+            )
     logging.info("server starting: host=%s port=%s", settings.http_host, settings.http_port)
     uvicorn.run(
         app,

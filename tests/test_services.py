@@ -32,6 +32,7 @@ def make_settings(miner_home: Path | None = None) -> Settings:
         target_model="Qwen/Qwen2.5-7B-Instruct",
         vllm_base_url="http://vllm:8000",
         dcgm_metrics_url="http://dcgm-exporter:9400/metrics",
+        miner_api_key="",
     )
 
 

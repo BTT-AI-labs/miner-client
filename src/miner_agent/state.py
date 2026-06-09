@@ -32,6 +32,21 @@ class AgentState:
         self.last_error = None
         self.consecutive_failures = 0
 
+    def public_dict(self) -> dict[str, Any]:
+        return {
+            "started_at": self.started_at,
+            "identity_loaded": self.identity_loaded,
+            "node_id": self.node_id,
+            "registered": self.registered,
+            "verified": self.verified,
+            "challenge_required": self.challenge_required,
+            "last_register_at": self.last_register_at,
+            "last_heartbeat_at": self.last_heartbeat_at,
+            "last_challenge_at": self.last_challenge_at,
+            "last_error": self.last_error,
+            "consecutive_failures": self.consecutive_failures,
+        }
+
     # determine whether current agent node is in [Ready] state
     def ready(self, heartbeat_interval_seconds: float) -> bool:
         if not self.identity_loaded:
