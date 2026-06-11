@@ -35,6 +35,7 @@ class Settings:
     request_timeout_seconds: float
     target_model: str | None
     vllm_base_url: str
+    vllm_api_key: str
     dcgm_metrics_url: str
     miner_api_key: str
 
@@ -72,6 +73,7 @@ class Settings:
             region=_getenv("MINER_REGION"),
             miner_token=_getenv("MINER_TOKEN"),
             miner_token_header=_getenv("MINER_TOKEN_HEADER", "X-Miner-Token"),
+            vllm_api_key=_getenv("MINER_VLLM_API_KEY", _getenv("MODELDOCK_INFERENCE_API_KEY")),
             miner_api_key=_getenv("MINER_API_KEY"),
         )
 
@@ -89,5 +91,6 @@ class Settings:
         data = asdict(self)
         data["miner_home"] = str(self.miner_home)
         data["miner_token"] = "***" if self.miner_token else ""
+        data["vllm_api_key"] = "***" if self.vllm_api_key else ""
         data["miner_api_key"] = "***" if self.miner_api_key else ""
         return data

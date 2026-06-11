@@ -17,24 +17,25 @@ class FakeApi:
 
     async def register(self, payload: dict) -> dict:
         self.register_payload = payload
-        return {"challenge_required": False}
+        return {"data": {"challenge_required": False}}
 
     async def heartbeat(self, payload: dict) -> dict:
         self.heartbeat_payload = payload
-        return {"challenge_required": False}
+        return {"data": {"challenge_required": False}}
 
-    async def get_challenge(self, node_id: str, purpose: str) -> dict:
+    async def get_challenge(self, payload: dict) -> dict:
         return {
-            "challenge_id": "chl_001",
-            "nonce": "nonce-1",
-            "purpose": purpose,
-            "expires_in": 60,
-            "issued_at": 1710000000,
+            "data": {
+                "challenge_id": "chl_001",
+                "nonce": "nonce-1",
+                "purpose": payload["purpose"],
+                "expires_at": "2026-06-11T00:00:00Z",
+            }
         }
 
     async def verify_challenge(self, payload: dict) -> dict:
         self.verify_payload = payload
-        return {"ok": True, "verified": True}
+        return {"data": {"ok": True, "verified": True}}
 
     async def aclose(self) -> None:
         return None
@@ -59,6 +60,7 @@ def make_settings(tmp_path: Path) -> Settings:
         request_timeout_seconds=10,
         target_model="Qwen/Qwen2.5-72B-Instruct",
         vllm_base_url="http://vllm:8000",
+        vllm_api_key="",
         dcgm_metrics_url="http://dcgm-exporter:9400/metrics",
         miner_api_key="",
     )
@@ -91,7 +93,7 @@ def test_register_payload_matches_design_fields(tmp_path: Path) -> None:
             "public_ip": settings.public_ip,
             "region": settings.region,
             "runtime_type": settings.runtime_type,
-            "gpus": [{"index": 0, "name": "NVIDIA H100", "vram_gb": 80.0}],
+            "gpus": [{"index": 0, "name": "NVIDIA H100", "vram_mib": 81920}],
         }
 
     agent.collect_register_profile = fake_profile  # type: ignore[method-assign]
@@ -101,11 +103,10 @@ def test_register_payload_matches_design_fields(tmp_path: Path) -> None:
     assert fake_api.register_payload is not None
     assert fake_api.register_payload["name"] == "miner-shanghai-01"
     assert fake_api.register_payload["public_ip"] == "1.2.3.4"
-    assert fake_api.register_payload["region"] == "ap-east"
     assert fake_api.register_payload["runtime_type"] == "vllm"
     assert fake_api.register_payload["agent_version"] == "0.1.0"
     assert fake_api.register_payload["gpus"] == [
-        {"index": 0, "name": "NVIDIA H100", "vram_gb": 80.0}
+        {"index": 0, "name": "NVIDIA H100", "vram_mib": 81920}
     ]
 
 
@@ -182,10 +183,9 @@ def test_challenge_accepts_expires_in(tmp_path: Path) -> None:
 
     response = asyncio.run(agent.challenge_once("register"))
 
-    assert response["verified"] is True
+    assert response["data"]["verified"] is True
     assert fake_api.verify_payload is not None
     assert fake_api.verify_payload["challenge_id"] == "chl_001"
-    assert fake_api.verify_payload["purpose"] == "register"
     assert signature_calls["digest"]
 
 

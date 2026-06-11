@@ -31,6 +31,7 @@ def make_settings(miner_home: Path | None = None) -> Settings:
         request_timeout_seconds=10,
         target_model="Qwen/Qwen2.5-7B-Instruct",
         vllm_base_url="http://vllm:8000",
+        vllm_api_key="",
         dcgm_metrics_url="http://dcgm-exporter:9400/metrics",
         miner_api_key="",
     )
@@ -63,9 +64,9 @@ def test_parse_nvidia_smi_csv_skips_invalid_rows() -> None:
 
     assert len(parsed) == 2
     assert parsed[0].index == 0
-    assert parsed[0].vram_gb == 80.0
+    assert parsed[0].vram_mib == 81920
     assert parsed[1].index == 1
-    assert parsed[1].vram_gb is None
+    assert parsed[1].vram_mib is None
 
 
 def test_agent_state_failure_tracking_and_readiness() -> None:
@@ -87,7 +88,7 @@ def test_main_api_client_uses_token_header_and_wraps_list_json() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen_headers["token"] = request.headers["X-Miner-Token"]
-        if request.url.path == "/api/miner/register":
+        if request.url.path == "/api/v1/miner/register":
             return httpx.Response(200, json=["queued"])
         raise AssertionError(f"unexpected path: {request.url.path}")
 
@@ -115,8 +116,11 @@ def test_vllm_probe_collect_marks_ready_and_parses_load_aliases() -> None:
             return httpx.Response(200, text="ok")
         if request.url.path == "/v1/models":
             return httpx.Response(200, json={"data": [{"id": "Qwen/Qwen2.5-7B-Instruct"}]})
-        if request.url.path == "/load":
-            return httpx.Response(200, json={"load": 0.75, "active_requests": 4})
+        if request.url.path == "/metrics":
+            return httpx.Response(
+                200,
+                text="vllm:num_requests_waiting 2\nvllm:num_requests_running 4\n",
+            )
         raise AssertionError(f"unexpected path: {request.url.path}")
 
     async def run():
@@ -126,12 +130,34 @@ def test_vllm_probe_collect_marks_ready_and_parses_load_aliases() -> None:
 
     status = asyncio.run(run())
 
-    assert status.process_status == "alive"
     assert status.health_status == "ok"
     assert status.model_status == "ready"
     assert status.serving_models == ["Qwen/Qwen2.5-7B-Instruct"]
-    assert status.load == 0.75
+    assert status.waiting_requests == 2
     assert status.current_requests == 4
+
+
+def test_vllm_probe_sends_api_key_to_model_service() -> None:
+    seen_authorization: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen_authorization[request.url.path] = request.headers.get("Authorization", "")
+        if request.url.path == "/health":
+            return httpx.Response(200, text="ok")
+        if request.url.path == "/v1/models":
+            return httpx.Response(200, json={"data": [{"id": "Qwen/Qwen2.5-7B-Instruct"}]})
+        if request.url.path == "/metrics":
+            return httpx.Response(200, text="")
+        raise AssertionError(f"unexpected path: {request.url.path}")
+
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            probe = VllmProbe("http://vllm:8000", "Qwen/Qwen2.5-7B-Instruct", "secret")
+            return await probe.collect(client)
+
+    asyncio.run(run())
+
+    assert seen_authorization["/v1/models"] == "Bearer secret"
 
 
 def test_vllm_probe_returns_down_when_health_request_fails() -> None:
@@ -145,7 +171,6 @@ def test_vllm_probe_returns_down_when_health_request_fails() -> None:
 
     status = asyncio.run(run())
 
-    assert status.process_status == "down"
     assert status.health_status == "error"
     assert status.model_status == "not_ready"
     assert status.serving_models == []

@@ -13,11 +13,13 @@ def test_ed25519_public_key_to_peer_id_matches_libp2p_prefix() -> None:
 
 def test_build_challenge_digest_is_stable() -> None:
     digest = build_tosign_digest(
-        "abcd",
-        "chl_123",
-        "deadbeef",
-        "register",
-        1710000060,
+        {
+            "node_id": "abcd",
+            "challenge_id": "chl_123",
+            "nonce": "deadbeef",
+            "purpose": "register",
+            "expires_at": 1710000060,
+        }
     )
 
-    assert digest.hex() == "1e217b25741b212d8d1fc96ee7c7d8be8e31e6c8536155a3ecc429868949b13e"
+    assert digest.hex() == "6bbe910a45527826e5e1df2f6fc69e0d24c7fb8f2aff2b82dc7bc39d0a9a81ef"

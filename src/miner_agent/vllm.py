@@ -32,9 +32,10 @@ class VllmStatus:
 
 
 class VllmProbe:
-    def __init__(self, base_url: str, target_model: str | None) -> None:
+    def __init__(self, base_url: str, target_model: str | None, api_key: str = "") -> None:
         self._base_url = base_url.rstrip("/")
         self._target_model = target_model
+        self._api_key = api_key.strip()
         logger.debug(
             "vllm probe initialized: base_url=%s target_model=%s",
             self._base_url,
@@ -47,7 +48,9 @@ class VllmProbe:
         current_requests: int | None = None
 
         try:
-            health_response = await client.get(f"{self._base_url}/health")
+            health_response = await client.get(
+                f"{self._base_url}/health", headers=self._auth_headers()
+            )
             if health_response.status_code == 200:
                 health_status = "ok"
             else:
@@ -68,7 +71,9 @@ class VllmProbe:
             )
 
         try:
-            models_response = await client.get(f"{self._base_url}/v1/models")
+            models_response = await client.get(
+                f"{self._base_url}/v1/models", headers=self._auth_headers()
+            )
             if models_response.status_code == 200:
                 serving_models = _parse_models(models_response.json())
             elif models_response.status_code != 200:
@@ -88,7 +93,9 @@ class VllmProbe:
             serving_models = []
 
         try:
-            load_response = await client.get(f"{self._base_url}/metrics")
+            load_response = await client.get(
+                f"{self._base_url}/metrics", headers=self._auth_headers()
+            )
             if load_response.status_code == 200:
                 waiting_requests, current_requests = _parse_load(load_response.text)
         except httpx.HTTPError as exc:
@@ -142,6 +149,11 @@ class VllmProbe:
             if current_requests is not None
             else current_requests,
         )
+
+    def _auth_headers(self) -> dict[str, str]:
+        if not self._api_key:
+            return {}
+        return {"Authorization": f"Bearer {self._api_key}"}
 
 
 def _parse_models(payload: dict[str, Any]) -> list[str]:

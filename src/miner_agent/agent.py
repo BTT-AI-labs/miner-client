@@ -33,7 +33,11 @@ class MinerAgent:
         self._probe_client = httpx.AsyncClient(
             timeout=httpx.Timeout(settings.request_timeout_seconds)
         )
-        self._vllm_probe = VllmProbe(settings.vllm_base_url, settings.target_model)
+        self._vllm_probe = VllmProbe(
+            settings.vllm_base_url,
+            settings.target_model,
+            settings.vllm_api_key,
+        )
         self._loop_task: asyncio.Task[None] | None = None
         self._closed = False
 
